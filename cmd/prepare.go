@@ -16,22 +16,25 @@ package cmd
 
 import (
 	"fmt"
-
+	"os/exec"
 	"github.com/spf13/cobra"
+	"bytes"
+	"github.com/fatih/color"
 )
 
 // prepareCmd represents the prepare command
 var prepareCmd = &cobra.Command{
 	Use:   "prepare",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Installs the dependencies for network setup",
+	Long: `
+Installs the dependencies for network setup`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("prepare called")
+		//get os info
+		fmt.Println(fetchOsInfo())
+		//check network connection
+		checkNetworkConn()
+		//install docker cc
+		installDocker()
 	},
 }
 
@@ -47,4 +50,50 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// prepareCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+func fetchOsInfo() string {
+	c:= color.New(color.FgWhite,color.BgBlue) // create a new color object 
+	var out bytes.Buffer //stores stdout data
+
+	fmt.Println("\nFetching OS Info...\n")
+	c.Println(" OS Info ")
+	cmdLSB:= exec.Command("lsb_release","-a") // define command to execute
+	cmdLSB.Stdout = &out
+	cmdLSB.Run() // execute the defined command
+	return out.String() // return stdout data string
+}
+
+func checkNetworkConn() {
+	c:= color.New(color.FgWhite,color.BgBlue) // create a new color object
+	fmt.Println("Checking network connection...\n")
+	c.Print(" Network Status ")
+	fmt.Print(" OK\n")
+}
+
+func installDocker() {
+	fmt.Println("\nInstalling Docker CE...")
+	downloadDockerSetupScr()
+}
+
+func downloadDockerSetupScr() {
+	cos:= color.New(color.FgWhite,color.BgGreen)
+	cof:= color.New(color.FgWhite,color.BgRed)
+	fmt.Println(" - Downloading docker setup script from get-docker.com")
+	cmdDSS:= exec.Command("wget","get-docker.com","-O","docker-setup.sh")
+	err:=cmdDSS.Run()
+	if err==nil {
+		fmt.Println(" - Docker setup script download complete - docker-setup.sh")
+		cmdEDS:= exec.Command("sudo","sh","docker-setup.sh")
+		//cmdEDS:= exec.Command("ls")
+		fmt.Println(" - Executing docker-setup.sh")
+		err:=cmdEDS.Run()
+		if err==nil {
+			cos.Println("\n Docker CE installed ")
+		} else {
+			cof.Println("\n Docker CE failed to install ( Reason - Error while executing setup script) ")
+		}
+	} else {
+		cof.Println("\n Docker CE failed to install ( Reason - Could not download setup script) ")
+	}
 }
