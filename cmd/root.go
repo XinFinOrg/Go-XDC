@@ -27,9 +27,17 @@ var cfgFile string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "go-xdc",
+	Use:   "xdc",
 	Short: "CLI tool for setting up XDC network.",
-	Long: `CLI tool for setting up XDC network.`,
+	Long: `CLI tool for setting up XDC network.
+	
+The tool does the following : 
+- Installs dependencies to setup the network
+- Setup the network
+- Start xdc network
+- Stop xdc network
+
+Complete documentation available at https://docs.io/`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	//	Run: func(cmd *cobra.Command, args []string) { },
