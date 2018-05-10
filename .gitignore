@@ -22,3 +22,6 @@ doc/
 
 # Ignore .idea files created by GoLand
 .idea/*
+
+go-xdc
+xdc
