@@ -35,6 +35,8 @@ Installs the dependencies for network setup`,
 		checkNetworkConn()
 		//install docker cc
 		installDocker()
+		//install docker cc
+		installDockerCompose()
 	},
 }
 
@@ -57,7 +59,8 @@ func fetchOsInfo() string {
 	var out bytes.Buffer //stores stdout data
 
 	fmt.Println("\nFetching OS Info...\n")
-	c.Println(" OS Info ")
+	c.Print(" OS Info ")
+	fmt.Println()
 	cmdLSB:= exec.Command("lsb_release","-a") // define command to execute
 	cmdLSB.Stdout = &out
 	cmdLSB.Run() // execute the defined command
@@ -67,8 +70,14 @@ func fetchOsInfo() string {
 func checkNetworkConn() {
 	c:= color.New(color.FgWhite,color.BgBlue) // create a new color object
 	fmt.Println("Checking network connection...\n")
+	cmdCN:= exec.Command("ping","-c","3","8.8.8.8")
 	c.Print(" Network Status ")
-	fmt.Print(" OK\n")
+	err:= cmdCN.Run()
+	if err==nil {
+		fmt.Print(" OK\n")
+	} else {
+		fmt.Print(" FAIL\n")
+	}
 }
 
 func installDocker() {
@@ -80,7 +89,7 @@ func downloadDockerSetupScr() {
 	cos:= color.New(color.FgWhite,color.BgGreen)
 	cof:= color.New(color.FgWhite,color.BgRed)
 	fmt.Println(" - Downloading docker setup script from get-docker.com")
-	cmdDSS:= exec.Command("wget","get-docker.com","-O","docker-setup.sh")
+	cmdDSS:= exec.Command("wget","--tries=3","get-docker.com","-O","docker-setup.sh")
 	err:=cmdDSS.Run()
 	if err==nil {
 		fmt.Println(" - Docker setup script download complete - docker-setup.sh")
@@ -89,11 +98,52 @@ func downloadDockerSetupScr() {
 		fmt.Println(" - Executing docker-setup.sh")
 		err:=cmdEDS.Run()
 		if err==nil {
-			cos.Println("\n Docker CE installed ")
+			fmt.Println()
+			cos.Print(" Docker CE installed ")
+			fmt.Println()
 		} else {
-			cof.Println("\n Docker CE failed to install ( Reason - Error while executing setup script) ")
+			fmt.Println()
+			cof.Print(" Docker CE failed to install (Reason - Error while executing setup script) ")
+			fmt.Println()
 		}
 	} else {
-		cof.Println("\n Docker CE failed to install ( Reason - Could not download setup script) ")
+		fmt.Println()
+		cof.Print(" Docker CE failed to install (Reason - Could not download setup script) ")
+		fmt.Println()
+	}
+}
+
+func installDockerCompose() {
+	fmt.Println("\nInstalling Docker Compose...")
+	downloadDockerComposeScr()
+}
+
+func downloadDockerComposeScr() {
+	cos:= color.New(color.FgWhite,color.BgGreen)
+	cof:= color.New(color.FgWhite,color.BgRed)
+	fmt.Println(" - Downloading Docker Compose")
+	cmdDCS:= exec.Command("/bin/sh","-c","wget --read-timeout=30 https://github.com/docker/compose/releases/download/1.21.1/docker-compose-$(uname -s)-$(uname -m) -O /usr/local/bin/docker-compose")
+	//cmdDCS:= exec.Command("ls")
+	cmdCHMOD:= exec.Command("sudo", "chmod" ,"+x", "/usr/local/bin/docker-compose")
+	err:=cmdDCS.Run()
+	if err!=nil {
+		cmdCHMOD.Run()
+		fmt.Println()
+		cof.Print(" Docker CE failed to install (Reason - Failed to download Docker Composer) ")
+		fmt.Println()
+	} else {
+		cmdCHMOD.Run()
+		fmt.Println(" - Download complete")
+		dockVer,err:= exec.Command("docker-compose","-v").Output()
+		if err==nil {
+			fmt.Printf(" - Verifying installation OK %s", dockVer)
+			fmt.Println()
+			cos.Print(" Docker Composer installed ")
+			fmt.Println()		
+		} else {
+			fmt.Println()
+			cof.Print(" Docker Composer failed to install ")
+			fmt.Println()
+		}
 	}
 }
