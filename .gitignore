@@ -12,3 +12,16 @@
 
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
+
+# Ignore other unneeded files.
+doc/
+*.swp
+*~
+.project
+.DS_Store
+
+# Ignore .idea files created by GoLand
+.idea/*
+
+go-xdc
+xdc
