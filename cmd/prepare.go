@@ -15,11 +15,12 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os/exec"
-	"github.com/spf13/cobra"
-	"bytes"
+
 	"github.com/fatih/color"
+	"github.com/spf13/cobra"
 )
 
 // prepareCmd represents the prepare command
@@ -55,25 +56,25 @@ func init() {
 }
 
 func fetchOsInfo() string {
-	c:= color.New(color.FgWhite,color.BgBlue) // create a new color object 
-	var out bytes.Buffer //stores stdout data
+	c := color.New(color.FgWhite, color.BgBlue) // create a new color object
+	var out bytes.Buffer                        //stores stdout data
 
 	fmt.Println("\nFetching OS Info...\n")
 	c.Print(" OS Info ")
 	fmt.Println()
-	cmdLSB:= exec.Command("lsb_release","-a") // define command to execute
+	cmdLSB := exec.Command("lsb_release", "-a") // define command to execute
 	cmdLSB.Stdout = &out
-	cmdLSB.Run() // execute the defined command
+	cmdLSB.Run()        // execute the defined command
 	return out.String() // return stdout data string
 }
 
 func checkNetworkConn() {
-	c:= color.New(color.FgWhite,color.BgBlue) // create a new color object
+	c := color.New(color.FgWhite, color.BgBlue) // create a new color object
 	fmt.Println("Checking network connection...\n")
-	cmdCN:= exec.Command("ping","-c","3","8.8.8.8")
+	cmdCN := exec.Command("ping", "-c", "3", "8.8.8.8")
 	c.Print(" Network Status ")
-	err:= cmdCN.Run()
-	if err==nil {
+	err := cmdCN.Run()
+	if err == nil {
 		fmt.Print(" OK\n")
 	} else {
 		fmt.Print(" FAIL\n")
@@ -86,18 +87,18 @@ func installDocker() {
 }
 
 func downloadDockerSetupScr() {
-	cos:= color.New(color.FgWhite,color.BgGreen)
-	cof:= color.New(color.FgWhite,color.BgRed)
+	cos := color.New(color.FgWhite, color.BgGreen)
+	cof := color.New(color.FgWhite, color.BgRed)
 	fmt.Println(" - Downloading docker setup script from get-docker.com")
-	cmdDSS:= exec.Command("wget","--tries=3","get-docker.com","-O","docker-setup.sh")
-	err:=cmdDSS.Run()
-	if err==nil {
+	cmdDSS := exec.Command("wget", "--tries=3", "get-docker.com", "-O", "docker-setup.sh")
+	err := cmdDSS.Run()
+	if err == nil {
 		fmt.Println(" - Docker setup script download complete - docker-setup.sh")
-		cmdEDS:= exec.Command("sudo","sh","docker-setup.sh")
+		cmdEDS := exec.Command("sudo", "sh", "docker-setup.sh")
 		//cmdEDS:= exec.Command("ls")
 		fmt.Println(" - Executing docker-setup.sh")
-		err:=cmdEDS.Run()
-		if err==nil {
+		err := cmdEDS.Run()
+		if err == nil {
 			fmt.Println()
 			cos.Print(" Docker CE installed ")
 			fmt.Println()
@@ -119,14 +120,14 @@ func installDockerCompose() {
 }
 
 func downloadDockerComposeScr() {
-	cos:= color.New(color.FgWhite,color.BgGreen)
-	cof:= color.New(color.FgWhite,color.BgRed)
+	cos := color.New(color.FgWhite, color.BgGreen)
+	cof := color.New(color.FgWhite, color.BgRed)
 	fmt.Println(" - Downloading Docker Compose")
-	cmdDCS:= exec.Command("/bin/sh","-c","wget --read-timeout=30 https://github.com/docker/compose/releases/download/1.21.1/docker-compose-$(uname -s)-$(uname -m) -O /usr/local/bin/docker-compose")
+	cmdDCS := exec.Command("/bin/sh", "-c", "wget --read-timeout=30 https://github.com/docker/compose/releases/download/1.21.1/docker-compose-$(uname -s)-$(uname -m) -O /usr/local/bin/docker-compose")
 	//cmdDCS:= exec.Command("ls")
-	cmdCHMOD:= exec.Command("sudo", "chmod" ,"+x", "/usr/local/bin/docker-compose")
-	err:=cmdDCS.Run()
-	if err!=nil {
+	cmdCHMOD := exec.Command("sudo", "chmod", "+x", "/usr/local/bin/docker-compose")
+	err := cmdDCS.Run()
+	if err != nil {
 		cmdCHMOD.Run()
 		fmt.Println()
 		cof.Print(" Docker CE failed to install (Reason - Failed to download Docker Composer) ")
@@ -134,12 +135,12 @@ func downloadDockerComposeScr() {
 	} else {
 		cmdCHMOD.Run()
 		fmt.Println(" - Download complete")
-		dockVer,err:= exec.Command("docker-compose","-v").Output()
-		if err==nil {
+		dockVer, err := exec.Command("docker-compose", "-v").Output()
+		if err == nil {
 			fmt.Printf(" - Verifying installation OK %s", dockVer)
 			fmt.Println()
 			cos.Print(" Docker Composer installed ")
-			fmt.Println()		
+			fmt.Println()
 		} else {
 			fmt.Println()
 			cof.Print(" Docker Composer failed to install ")
