@@ -153,8 +153,13 @@ func getUnusedPort(host string, portType int, portRange int) int {
 }
 
 func setupNetwork(s *Inputs) {
+	scaffoldNodeDir(s)
+	createTmFile(s)
+}
 
-	fmt.Println(" - Setting up your Network")
+func scaffoldNodeDir(s *Inputs) {
+
+	fmt.Println("\n - Getting current working directory")
 
 	//Get Working Directory
 	dir, err := os.Getwd()
@@ -176,18 +181,24 @@ func setupNetwork(s *Inputs) {
 	for i := 1; i <= s.nodes; i++ {
 		qd = "qdata_" + strconv.Itoa(i)
 
+		fmt.Println(" - Creating dir structure for node  " + strconv.Itoa(i))
+
+		//create logs folder
 		logpath := filepath.Join(dir, "/"+qd+"/logs")
 		os.MkdirAll(logpath, os.ModePerm)
 
+		//create keys folder
 		keyspath := filepath.Join(dir, "/"+qd+"/keys")
 		os.MkdirAll(keyspath, os.ModePerm)
 
+		//create dd folder
 		gethpath := filepath.Join(dir, "/"+qd+"/dd/geth")
 		os.MkdirAll(gethpath, os.ModePerm)
 
 		keystorepath := filepath.Join(dir, "/"+qd+"/dd/keystore")
 		os.MkdirAll(keystorepath, os.ModePerm)
 
+		//create password file
 		passwordfilepath := filepath.Join(dir, "/"+qd+"/passwords.txt")
 		os.Create(passwordfilepath)
 
@@ -230,4 +241,26 @@ func setupNetwork(s *Inputs) {
 
 	fmt.Fprintf(staticnodesfile, "]")
 
+}
+
+//create tm conf files [ TO-DO ]
+func createTmFile(s *Inputs) {
+	//Get Working Directory
+	dir, _ := os.Getwd()
+
+	for i := 1; i <= s.nodes; i++ {
+		qd = "qdata_" + strconv.Itoa(i)
+		//create tmconf
+		tmfilepath := filepath.Join(dir, "/"+qd+"/tm.conf")
+		tmfile, _ := os.Create(tmfilepath)
+		defer tmfile.Close()
+		fmt.Fprintln(tmfile, `url = "`+s.publicIP+`"`)
+		fmt.Fprintln(tmfile, `port = 9001`)
+		fmt.Fprintln(tmfile, `socket = "/qdata/tm.ipc"`)
+		fmt.Fprintln(tmfile, `othernodes = ["http://0.0.0.0:9001/","http://0.0.0.0:9002/"]"`)
+		fmt.Fprintln(tmfile, `publickeys = ["/qdata/keys/tm.pub"]`)
+		fmt.Fprintln(tmfile, `privatekeys = ["/qdata/keys/tm.key"]`)
+		fmt.Fprintln(tmfile, `storage = "/qdata/constellation"`)
+		fmt.Fprintln(tmfile, `verbosity = 3`)
+	}
 }
