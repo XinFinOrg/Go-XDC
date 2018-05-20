@@ -24,6 +24,14 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"gopkg.in/AlecAivazis/survey.v1"
+
+	"strings"
+	"github.com/docker/docker/client"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
+	"golang.org/x/net/context"
+	"github.com/docker/docker/api/types"
+	"bytes"
 )
 
 // struct holds user provided input data
@@ -44,10 +52,14 @@ var image = "xinfinorg/quorum:v2.0.0"
 
 var qd string
 var separator string
+var enode_id string
 var enode_url string
+var hostPath string
+var containerPath string
+var cmdString1 []string
+var cmdString2 []string
 
-//Test enode address, key, genesis (To-Do - generate all enode addressess using bootnode binary)
-var enode_address = "26e80451f629db9249cf1f325e1346863532987ec816103b3ef64d193b213786d80837dfebfd5d42ec05ed755c0e520739808fe9134efb350b7bbf9cb8fc5d06"
+//Test keystore, genesis file
 var keystore_string = "{\"address\":\"0638e1574728b6d862dd5d3a3e0942c3be47d996\",\"crypto\":{\"cipher\":\"aes-128-ctr\",\"ciphertext\":\"d8119d67cb134bc65c53506577cfd633bbbf5acca976cea12dd507de3eb7fd6f\",\"cipherparams\":{\"iv\":\"76e88f3f246d4bf9544448d1a27b06f4\"},\"kdf\":\"scrypt\",\"kdfparams\":{\"dklen\":32,\"n\":262144,\"p\":1,\"r\":8,\"salt\":\"6d05ade3ee96191ed73ea019f30c02cceb6fc0502c99f706b7b627158bfc2b0a\"},\"mac\":\"b39c2c56b35958c712225970b49238fb230d7981ef47d7c33c730c363b658d06\"},\"id\":\"00307b43-53a3-4e03-9d0c-4fcbb3da29df\",\"version\":3}"
 var genesis_string = "{\"alloc\": {    \"0638e1574728b6d862dd5d3a3e0942c3be47d996\": {      \"balance\": \"0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\"    }  },  \"coinbase\": \"0x0000000000000000000000000000000000000000\",  \"config\": {    \"homesteadBlock\": 0,    \"chainId\": 1,    \"eip155Block\": null,    \"eip158Block\": null,    \"isQuorum\": true  },  \"difficulty\": \"0x0\",  \"extraData\": \"0x0000000000000000000000000000000000000000000000000000000000000000\",  \"gasLimit\": \"0x47b760\",  \"mixhash\": \"0x00000000000000000000000000000000000000647572616c65787365646c6578\",  \"nonce\": \"0x0\",  \"parentHash\": \"0x0000000000000000000000000000000000000000000000000000000000000000\",  \"timestamp\": \"0x00\"}"
 
@@ -177,7 +189,7 @@ func scaffoldNodeDir(s *Inputs) {
 
 	fmt.Fprintf(staticnodesfile, "[\n")
 
-	//Create dir structure/files add enode addresses to static-nodes.json [for each node]
+	//Create dir structure/files & add enode urls to static-nodes.json [for each node]
 	for i := 1; i <= s.nodes; i++ {
 		qd = "qdata_" + strconv.Itoa(i)
 
@@ -202,14 +214,22 @@ func scaffoldNodeDir(s *Inputs) {
 		passwordfilepath := filepath.Join(dir, "/"+qd+"/passwords.txt")
 		os.Create(passwordfilepath)
 
+		//create start-node.sh file - TO-DO Populate this file with custom parameters & then start geth/constellation
+		startnodefilepath := filepath.Join(dir, "/"+qd+"/start-node.sh")
+		os.Create(startnodefilepath)
+
+		// Set permissions for start-node.sh
+		err := os.Chmod(startnodefilepath, 0755)
+		if err != nil {
+			log.Println(err)
+		}
+
+		//Separator for static-nodes.json urls - no comma after last node address
 		if i < s.nodes {
 			separator = ","
 		} else {
 			separator = ""
 		}
-
-		enode_url = "enode://" + enode_address + "@" + s.publicIP + ":" + strconv.Itoa(getUnusedPort("localhost", 0, s.portRange)) + "?discport=0&raftport=" + strconv.Itoa(getUnusedPort("localhost", 1, s.portRange))
-		fmt.Fprintf(staticnodesfile, strconv.Quote(enode_url)+separator+"\n")
 
 		//Create Key File
 		keyfilepath := filepath.Join(dir, "/"+qd+"/dd/keystore/key")
@@ -230,6 +250,24 @@ func scaffoldNodeDir(s *Inputs) {
 		defer genesisfile.Close()
 
 		fmt.Fprintf(genesisfile, genesis_string)
+
+
+		//Set docker host & container mount directories
+		hostPath = filepath.Join(dir, "/"+qd)
+		containerPath = "/qdata"
+
+		//Generate nodekey
+		cmdString1 = []string {"/usr/local/bin/bootnode", "-genkey", "/qdata/dd/nodekey"}
+		runDockerContainer(hostPath, containerPath, cmdString1)
+
+		//Return hash for generated key for use in static-nodes
+		cmdString2= []string {"/usr/local/bin/bootnode", "--nodekey", "/qdata/dd/nodekey", "-writeaddress"}
+		enode_id = runDockerContainer(hostPath, containerPath, cmdString2)
+		enode_id = strings.TrimRight(enode_id, "\r\n")
+
+		//Construct enode url
+		enode_url="enode://"+ enode_id +"@"+s.publicIP+":"+strconv.Itoa(GETH_PORT_OFFSET+i)+"?discport=0&raftport="+strconv.Itoa(RAFT_PORT_OFFSET+i)
+		fmt.Fprintf(staticnodesfile, strconv.Quote(enode_url)+separator+"\n")
 
 		//To-Do
 		// 1-Create Constellation config files & keys
@@ -264,3 +302,55 @@ func createTmFile(s *Inputs) {
 		fmt.Fprintln(tmfile, `verbosity = 3`)
 	}
 }
+
+func runDockerContainer(hostPath string, containerPath string, cmdString []string) string {
+
+	ctx := context.Background()
+	cli, err := client.NewEnvClient()
+	if err != nil {
+		panic(err)
+	}
+
+	resp, err := cli.ContainerCreate(ctx, &container.Config{
+		Image: image,
+		Cmd:   cmdString,
+		Tty:   true,
+	}, &container.HostConfig{
+		Mounts: []mount.Mount{
+			{
+				Type:   mount.TypeBind,
+				Source: hostPath,
+				Target: containerPath,
+			},
+		},
+	}, nil, "")
+	if err != nil {
+		panic(err)
+	}
+
+	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+		panic(err)
+	}
+
+
+	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
+	select {
+	case err := <-errCh:
+		if err != nil {
+			panic(err)
+		}
+	case <-statusCh:
+	}
+
+	out, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true})
+	if err != nil {
+		panic(err)
+	}
+
+	//io.Copy(os.Stdout, out)
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(out)
+	stdoutStr := buf.String()
+	return stdoutStr
+}
+
