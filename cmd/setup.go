@@ -266,7 +266,7 @@ func scaffoldNodeDir(s *Inputs) {
 		enode_id = strings.TrimRight(enode_id, "\r\n")
 
 		//Construct enode url
-		enode_url="enode://"+ enode_id +"@"+s.publicIP+":"+strconv.Itoa(GETH_PORT_OFFSET+i)+"?discport=0&raftport="+strconv.Itoa(RAFT_PORT_OFFSET+i)
+		enode_url="enode://"+ enode_id +"@"+s.publicIP+":"+strconv.Itoa(getUnusedPort("localhost", 0, s.portRange))+"?discport=0&raftport="+strconv.Itoa(getUnusedPort("localhost",1, s.portRange))
 		fmt.Fprintf(staticnodesfile, strconv.Quote(enode_url)+separator+"\n")
 
 		//To-Do
