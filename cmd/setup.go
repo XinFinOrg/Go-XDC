@@ -32,6 +32,8 @@ import (
 	"golang.org/x/net/context"
 	"github.com/docker/docker/api/types"
 	"bytes"
+	"gopkg.in/yaml.v2"
+	"io/ioutil"
 )
 
 // struct holds user provided input data
@@ -289,6 +291,20 @@ func scaffoldNodeDir(s *Inputs) {
 
 	fmt.Fprintf(staticnodesfile, "]")
 
+
+	//YAML MockConfig file for docker-compose
+	err1 := saveConfig(createMockConfig(), "docker-compose.yml")
+	if err1 != nil {
+		panic(err1)
+	}
+
+	c, err1 := loadConfig("docker-compose.yml")
+	if err1 != nil {
+		panic(err1)
+	}
+
+	fmt.Printf("%+v\n", c)
+
 }
 
 //create tm conf files [ TO-DO ]
@@ -364,3 +380,82 @@ func runDockerContainer(hostPath string, containerPath string, cmdString []strin
 	return stdoutStr
 }
 
+
+type Node struct {
+	Image string `yaml:"image"`
+	Restart string `yaml:"restart"`
+	Volumes []string `yaml:"volumes"`
+	Networks []string `yaml:"networks"`
+	Ports []string `yaml:"ports"`
+	User string   `yaml:"user"`
+}
+
+type Network struct {
+	Driver     string    `yaml:"driver"`
+	IPAM IPAM `yaml:"ipam"`
+}
+type IPAM struct {
+	Driver     string    `yaml:"driver"`
+	Config []Subnet `yaml:"config"`
+}
+
+type Subnet struct {
+	Subnet string `yaml:"subnet"`
+}
+
+type Configuration struct {
+	Version     string    `yaml:"version"`
+	Services    map[string]Node `yaml:"services"`
+	Networks    map[string]Network  `yaml:"networks"`
+}
+
+func createMockConfig() Configuration {
+	return Configuration{
+		Version: "2",
+
+		Services:map[string]Node{
+			"node_1":Node{
+					Image:   "xinfinorg/quorum:v2.0.0",
+					Restart: "always",
+					Volumes: []string{"./qdata_1:/qdata"},
+					Networks: []string{"xdc_network"},
+					Ports: []string{"21001:21001", "22001:22001", "23001:23001", "9001:9001"},
+					User: "0:0",
+			},
+		},
+			Networks:map[string]Network{
+				"xdc_network":Network{
+					Driver: "bridge",
+					IPAM: IPAM{
+						Driver: "default",
+						Config: []Subnet{Subnet{Subnet:"172.16.0.0/16"}},
+					},
+					},
+				},
+
+	}
+}
+
+func saveConfig(c Configuration, filename string) error {
+	bytes, err := yaml.Marshal(c)
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(filename, bytes, 0644)
+}
+
+func loadConfig(filename string) (Configuration, error) {
+	bytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return Configuration{}, err
+	}
+
+	var c Configuration
+	err = yaml.Unmarshal(bytes, &c)
+	if err != nil {
+		return Configuration{}, err
+	}
+
+	return c, nil
+}
