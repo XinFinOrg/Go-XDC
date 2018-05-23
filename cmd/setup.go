@@ -58,6 +58,8 @@ var hostPath string
 var containerPath string
 var cmdString1 []string
 var cmdString2 []string
+var cmdString3 []string
+
 
 //Test keystore, genesis file
 var keystore_string = "{\"address\":\"0638e1574728b6d862dd5d3a3e0942c3be47d996\",\"crypto\":{\"cipher\":\"aes-128-ctr\",\"ciphertext\":\"d8119d67cb134bc65c53506577cfd633bbbf5acca976cea12dd507de3eb7fd6f\",\"cipherparams\":{\"iv\":\"76e88f3f246d4bf9544448d1a27b06f4\"},\"kdf\":\"scrypt\",\"kdfparams\":{\"dklen\":32,\"n\":262144,\"p\":1,\"r\":8,\"salt\":\"6d05ade3ee96191ed73ea019f30c02cceb6fc0502c99f706b7b627158bfc2b0a\"},\"mac\":\"b39c2c56b35958c712225970b49238fb230d7981ef47d7c33c730c363b658d06\"},\"id\":\"00307b43-53a3-4e03-9d0c-4fcbb3da29df\",\"version\":3}"
@@ -268,6 +270,14 @@ func scaffoldNodeDir(s *Inputs) {
 		//Construct enode url
 		enode_url="enode://"+ enode_id +"@"+s.publicIP+":"+strconv.Itoa(getUnusedPort("localhost", 0, s.portRange))+"?discport=0&raftport="+strconv.Itoa(getUnusedPort("localhost",1, s.portRange))
 		fmt.Fprintf(staticnodesfile, strconv.Quote(enode_url)+separator+"\n")
+
+
+		// Generate Quorum-related keys (used by Constellation)
+		// NOTE: using sh here as this command asks user input for the password
+		// < /dev/null would set an empty password and > /dev/null  will set no output
+		cmdString3 = []string {"sh", "-c", "/usr/local/bin/constellation-node --generatekeys=/qdata/keys/tm < /dev/null > /dev/null"}
+		runDockerContainer(hostPath, containerPath, cmdString3)
+
 
 		//To-Do
 		// 1-Create Constellation config files & keys
