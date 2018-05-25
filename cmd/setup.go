@@ -15,6 +15,7 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -24,16 +25,16 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"gopkg.in/AlecAivazis/survey.v1"
+	yaml "gopkg.in/yaml.v2"
 
+	"bytes"
 	"strings"
-	"github.com/docker/docker/client"
+
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/client"
 	"golang.org/x/net/context"
-	"github.com/docker/docker/api/types"
-	"bytes"
-	"gopkg.in/yaml.v2"
-	"io/ioutil"
 )
 
 // struct holds user provided input data
@@ -43,6 +44,14 @@ type Inputs struct {
 	dockerSubnetIP string
 	portRange      int
 	nodes          int
+}
+
+// port selection struct
+var PortSel struct {
+	geth          []int
+	rpc           []int
+	raft          []int
+	constellation []int
 }
 
 var GETH_PORT_OFFSET = 0
@@ -61,7 +70,6 @@ var containerPath string
 var cmdString1 []string
 var cmdString2 []string
 var cmdString3 []string
-
 
 //Test keystore, genesis file
 var keystore_string = "{\"address\":\"0638e1574728b6d862dd5d3a3e0942c3be47d996\",\"crypto\":{\"cipher\":\"aes-128-ctr\",\"ciphertext\":\"d8119d67cb134bc65c53506577cfd633bbbf5acca976cea12dd507de3eb7fd6f\",\"cipherparams\":{\"iv\":\"76e88f3f246d4bf9544448d1a27b06f4\"},\"kdf\":\"scrypt\",\"kdfparams\":{\"dklen\":32,\"n\":262144,\"p\":1,\"r\":8,\"salt\":\"6d05ade3ee96191ed73ea019f30c02cceb6fc0502c99f706b7b627158bfc2b0a\"},\"mac\":\"b39c2c56b35958c712225970b49238fb230d7981ef47d7c33c730c363b658d06\"},\"id\":\"00307b43-53a3-4e03-9d0c-4fcbb3da29df\",\"version\":3}"
@@ -162,6 +170,15 @@ func getUnusedPort(host string, portType int, portRange int) int {
 			portt++
 		} else {
 			//fmt.Println("Port available ", strconv.Itoa(portt))
+			if portType == 0 {
+				PortSel.geth = append(PortSel.geth, portt)
+			} else if portType == 1 {
+				PortSel.raft = append(PortSel.raft, portt)
+			} else if portType == 2 {
+				PortSel.constellation = append(PortSel.constellation, portt)
+			} else if portType == 3 {
+				PortSel.rpc = append(PortSel.rpc, portt)
+			}
 			break
 		}
 	}
@@ -170,7 +187,8 @@ func getUnusedPort(host string, portType int, portRange int) int {
 
 func setupNetwork(s *Inputs) {
 	scaffoldNodeDir(s)
-	createTmFile(s)
+	createTmFiles(s)
+	createDockerComposeFile(s)
 }
 
 func scaffoldNodeDir(s *Inputs) {
@@ -255,31 +273,31 @@ func scaffoldNodeDir(s *Inputs) {
 
 		fmt.Fprintf(genesisfile, genesis_string)
 
-
 		//Set docker host & container mount directories
 		hostPath = filepath.Join(dir, "/"+qd)
 		containerPath = "/qdata"
 
 		//Generate nodekey
-		cmdString1 = []string {"/usr/local/bin/bootnode", "-genkey", "/qdata/dd/nodekey"}
+		cmdString1 = []string{"/usr/local/bin/bootnode", "-genkey", "/qdata/dd/nodekey"}
 		runDockerContainer(hostPath, containerPath, cmdString1)
 
 		//Return hash for generated key for use in static-nodes
-		cmdString2= []string {"/usr/local/bin/bootnode", "--nodekey", "/qdata/dd/nodekey", "-writeaddress"}
+		cmdString2 = []string{"/usr/local/bin/bootnode", "--nodekey", "/qdata/dd/nodekey", "-writeaddress"}
 		enode_id = runDockerContainer(hostPath, containerPath, cmdString2)
 		enode_id = strings.TrimRight(enode_id, "\r\n")
 
 		//Construct enode url
-		enode_url="enode://"+ enode_id +"@"+s.publicIP+":"+strconv.Itoa(getUnusedPort("localhost", 0, s.portRange))+"?discport=0&raftport="+strconv.Itoa(getUnusedPort("localhost",1, s.portRange))
+		enode_url = "enode://" + enode_id + "@" + s.publicIP + ":" + strconv.Itoa(getUnusedPort("localhost", 0, s.portRange)) + "?discport=0&raftport=" + strconv.Itoa(getUnusedPort("localhost", 1, s.portRange))
 		fmt.Fprintf(staticnodesfile, strconv.Quote(enode_url)+separator+"\n")
 
+		//assign/reserve rpc port
+		getUnusedPort("localhost", 3, s.portRange)
 
 		// Generate Quorum-related keys (used by Constellation)
 		// NOTE: using sh here as this command asks user input for the password
 		// < /dev/null would set an empty password and > /dev/null  will set no output
-		cmdString3 = []string {"sh", "-c", "/usr/local/bin/constellation-node --generatekeys=/qdata/keys/tm < /dev/null > /dev/null"}
+		cmdString3 = []string{"sh", "-c", "/usr/local/bin/constellation-node --generatekeys=/qdata/keys/tm < /dev/null > /dev/null"}
 		runDockerContainer(hostPath, containerPath, cmdString3)
-
 
 		//To-Do
 		// 1-Create Constellation config files & keys
@@ -291,24 +309,49 @@ func scaffoldNodeDir(s *Inputs) {
 
 	fmt.Fprintf(staticnodesfile, "]")
 
+	//copy static-nodes.json to each folder
+	copyStaticNode(s)
 
 	//YAML MockConfig file for docker-compose
-	err1 := saveConfig(createMockConfig(), "docker-compose.yml")
+
+	/*c, err1 := loadConfig("docker-compose.yml")
 	if err1 != nil {
 		panic(err1)
 	}
+	fmt.Printf("%+v\n", c)*/
 
-	c, err1 := loadConfig("docker-compose.yml")
+}
+
+//create docker-compose.yaml file
+func createDockerComposeFile(s *Inputs) {
+	err1 := saveConfig(createMockConfig(s), "docker-compose.yml")
 	if err1 != nil {
 		panic(err1)
 	}
+}
 
-	fmt.Printf("%+v\n", c)
+//copy static-nodes.json to each qdata folder
+func copyStaticNode(s *Inputs) {
+	for i := 1; i <= s.nodes; i++ {
+		_, err := exec.Command("cp", "static-nodes.json", "qdata_"+strconv.Itoa(i)).Output()
+		if err != nil {
+			panic(err)
+		}
+	}
 
 }
 
 //create tm conf files [ TO-DO ]
-func createTmFile(s *Inputs) {
+func createTmFiles(s *Inputs) {
+
+	fmt.Println(" - Generating tm.conf files for each node")
+
+	// allocate constellation ports for all the nodes
+	for i := 1; i <= s.nodes; i++ {
+		getUnusedPort("localhost", 2, s.portRange)
+	}
+
+	fmt.Println(PortSel.constellation)
 	//Get Working Directory
 	dir, _ := os.Getwd()
 
@@ -319,14 +362,30 @@ func createTmFile(s *Inputs) {
 		tmfile, _ := os.Create(tmfilepath)
 		defer tmfile.Close()
 		fmt.Fprintln(tmfile, `url = "`+s.publicIP+`"`)
-		fmt.Fprintln(tmfile, `port = 9001`)
+		fmt.Fprintln(tmfile, `port =`+strconv.Itoa(PortSel.constellation[i-1]))
 		fmt.Fprintln(tmfile, `socket = "/qdata/tm.ipc"`)
-		fmt.Fprintln(tmfile, `othernodes = ["http://0.0.0.0:9001/","http://0.0.0.0:9002/"]"`)
+		fmt.Fprintln(tmfile, `othernodes = `+makeOtherNodesString(s.publicIP))
 		fmt.Fprintln(tmfile, `publickeys = ["/qdata/keys/tm.pub"]`)
 		fmt.Fprintln(tmfile, `privatekeys = ["/qdata/keys/tm.key"]`)
 		fmt.Fprintln(tmfile, `storage = "/qdata/constellation"`)
 		fmt.Fprintln(tmfile, `verbosity = 3`)
 	}
+}
+
+func makeOtherNodesString(publicIP string) string {
+	var str string
+
+	for _, elem := range PortSel.constellation {
+		str = str + `"` + publicIP + `:` + strconv.Itoa(elem) + `",`
+	}
+
+	lastChar := str[len(str)-1:]
+
+	if lastChar == `,` {
+		str = strings.TrimRight(str, ",")
+	}
+
+	return `[` + str + `]`
 }
 
 func runDockerContainer(hostPath string, containerPath string, cmdString []string) string {
@@ -358,7 +417,6 @@ func runDockerContainer(hostPath string, containerPath string, cmdString []strin
 		panic(err)
 	}
 
-
 	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
@@ -380,22 +438,21 @@ func runDockerContainer(hostPath string, containerPath string, cmdString []strin
 	return stdoutStr
 }
 
-
 type Node struct {
-	Image string `yaml:"image"`
-	Restart string `yaml:"restart"`
-	Volumes []string `yaml:"volumes"`
+	Image    string   `yaml:"image"`
+	Restart  string   `yaml:"restart"`
+	Volumes  []string `yaml:"volumes"`
 	Networks []string `yaml:"networks"`
-	Ports []string `yaml:"ports"`
-	User string   `yaml:"user"`
+	Ports    []string `yaml:"ports"`
+	User     string   `yaml:"user"`
 }
 
 type Network struct {
-	Driver     string    `yaml:"driver"`
-	IPAM IPAM `yaml:"ipam"`
+	Driver string `yaml:"driver"`
+	IPAM   IPAM   `yaml:"ipam"`
 }
 type IPAM struct {
-	Driver     string    `yaml:"driver"`
+	Driver string   `yaml:"driver"`
 	Config []Subnet `yaml:"config"`
 }
 
@@ -404,35 +461,39 @@ type Subnet struct {
 }
 
 type Configuration struct {
-	Version     string    `yaml:"version"`
-	Services    map[string]Node `yaml:"services"`
-	Networks    map[string]Network  `yaml:"networks"`
+	Version  string             `yaml:"version"`
+	Services map[string]Node    `yaml:"services"`
+	Networks map[string]Network `yaml:"networks"`
 }
 
-func createMockConfig() Configuration {
+func createMockConfig(s *Inputs) Configuration {
+	servtest1 := map[string]Node{}
+	for i := 0; i < s.nodes; i++ {
+		rpcPortStr := strconv.Itoa(PortSel.rpc[i])
+		gethPortStr := strconv.Itoa(PortSel.geth[i])
+		constellationPortStr := strconv.Itoa(PortSel.constellation[i])
+		raftPortStr := strconv.Itoa(PortSel.raft[i])
+		servtest1["node_"+strconv.Itoa(i+1)] = Node{
+			Image:    "xinfinorg/quorum:v2.0.0",
+			Restart:  "always",
+			Volumes:  []string{"./qdata_" + strconv.Itoa(i+1) + ":/qdata"},
+			Networks: []string{"xdc_network"},
+			Ports:    []string{gethPortStr + ":" + gethPortStr, rpcPortStr + ":" + rpcPortStr, constellationPortStr + ":" + constellationPortStr, raftPortStr + ":" + raftPortStr},
+			User:     "0:0",
+		}
+	}
 	return Configuration{
-		Version: "2",
-
-		Services:map[string]Node{
-			"node_1":Node{
-					Image:   "xinfinorg/quorum:v2.0.0",
-					Restart: "always",
-					Volumes: []string{"./qdata_1:/qdata"},
-					Networks: []string{"xdc_network"},
-					Ports: []string{"21001:21001", "22001:22001", "23001:23001", "9001:9001"},
-					User: "0:0",
+		Version:  "2",
+		Services: servtest1,
+		Networks: map[string]Network{
+			"xdc_network": Network{
+				Driver: "bridge",
+				IPAM: IPAM{
+					Driver: "default",
+					Config: []Subnet{Subnet{Subnet: s.dockerSubnetIP}},
+				},
 			},
 		},
-			Networks:map[string]Network{
-				"xdc_network":Network{
-					Driver: "bridge",
-					IPAM: IPAM{
-						Driver: "default",
-						Config: []Subnet{Subnet{Subnet:"172.16.0.0/16"}},
-					},
-					},
-				},
-
 	}
 }
 
