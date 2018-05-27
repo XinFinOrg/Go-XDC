@@ -123,7 +123,7 @@ func getUserInput(s *Inputs) {
 	publicIPPrompt := &survey.Input{Message: "Public IP Address", Default: "0.0.0.0"}
 
 	//define docker subnet prompt
-	dockerSubnetIPPrompt := &survey.Input{Message: "Docker Subnet IP", Default: "0.0.0.0/16"}
+	dockerSubnetIPPrompt := &survey.Input{Message: "Docker Subnet IP", Default: "172.13.0.0/16"}
 
 	survey.AskOne(publicIPPrompt, &s.publicIP, nil)
 	survey.AskOne(dockerSubnetIPPrompt, &s.dockerSubnetIP, nil)
@@ -188,18 +188,28 @@ func getUnusedPort(host string, portType int, portRange int) int {
 func setupNetwork(s *Inputs) {
 	scaffoldNodeDir(s)
 	createTmFiles(s)
+	createStartNodeScript(s)
 	createDockerComposeFile(s)
+	setupComplete()
+}
+
+func setupComplete() {
+	c := color.New(color.FgWhite, color.BgGreen) // create a new color object
+
+	fmt.Println()
+	c.Println(" Setup complete ")
+	fmt.Println()
 }
 
 func scaffoldNodeDir(s *Inputs) {
-
-	fmt.Println("\n - Getting current working directory")
 
 	//Get Working Directory
 	dir, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	fmt.Println("\n - Getting current working directory - " + dir)
 
 	//Create static-nodes.json file
 	staticnodesfilepath := filepath.Join(dir, "/static-nodes.json")
@@ -215,7 +225,7 @@ func scaffoldNodeDir(s *Inputs) {
 	for i := 1; i <= s.nodes; i++ {
 		qd = "qdata_" + strconv.Itoa(i)
 
-		fmt.Println(" - Creating dir structure for node  " + strconv.Itoa(i))
+		fmt.Println(" - Creating dir structure for node " + strconv.Itoa(i) + " - " + qd)
 
 		//create logs folder
 		logpath := filepath.Join(dir, "/"+qd+"/logs")
@@ -285,7 +295,7 @@ func scaffoldNodeDir(s *Inputs) {
 		cmdString2 = []string{"/usr/local/bin/bootnode", "--nodekey", "/qdata/dd/nodekey", "-writeaddress"}
 		enode_id = runDockerContainer(hostPath, containerPath, cmdString2)
 		enode_id = strings.TrimRight(enode_id, "\r\n")
-
+		fmt.Println(" - Generating nodeKey for node " + strconv.Itoa(i))
 		//Construct enode url
 		enode_url = "enode://" + enode_id + "@" + s.publicIP + ":" + strconv.Itoa(getUnusedPort("localhost", 0, s.portRange)) + "?discport=0&raftport=" + strconv.Itoa(getUnusedPort("localhost", 1, s.portRange))
 		fmt.Fprintf(staticnodesfile, strconv.Quote(enode_url)+separator+"\n")
@@ -324,6 +334,7 @@ func scaffoldNodeDir(s *Inputs) {
 
 //create docker-compose.yaml file
 func createDockerComposeFile(s *Inputs) {
+	fmt.Println(" - Generating docker-compose.yml file")
 	err1 := saveConfig(createMockConfig(s), "docker-compose.yml")
 	if err1 != nil {
 		panic(err1)
@@ -333,7 +344,7 @@ func createDockerComposeFile(s *Inputs) {
 //copy static-nodes.json to each qdata folder
 func copyStaticNode(s *Inputs) {
 	for i := 1; i <= s.nodes; i++ {
-		_, err := exec.Command("cp", "static-nodes.json", "qdata_"+strconv.Itoa(i)).Output()
+		_, err := exec.Command("cp", "static-nodes.json", "qdata_"+strconv.Itoa(i)+"/dd").Output()
 		if err != nil {
 			panic(err)
 		}
@@ -344,18 +355,16 @@ func copyStaticNode(s *Inputs) {
 //create tm conf files [ TO-DO ]
 func createTmFiles(s *Inputs) {
 
-	fmt.Println(" - Generating tm.conf files for each node")
-
 	// allocate constellation ports for all the nodes
 	for i := 1; i <= s.nodes; i++ {
 		getUnusedPort("localhost", 2, s.portRange)
 	}
 
-	fmt.Println(PortSel.constellation)
 	//Get Working Directory
 	dir, _ := os.Getwd()
 
 	for i := 1; i <= s.nodes; i++ {
+		fmt.Println(" - Generating tm.conf files for node " + strconv.Itoa(i))
 		qd = "qdata_" + strconv.Itoa(i)
 		//create tmconf
 		tmfilepath := filepath.Join(dir, "/"+qd+"/tm.conf")
@@ -494,6 +503,51 @@ func createMockConfig(s *Inputs) Configuration {
 				},
 			},
 		},
+	}
+}
+
+func createStartNodeScript(s *Inputs) {
+	var script = `#!/bin/bash
+
+	#
+	# This is used at Container start up to run the constellation and geth nodes
+	#
+	
+	set -u
+	set -e
+	
+	### Configuration Options
+	TMCONF=/qdata/tm.conf
+	
+	GETH_ARGS="--datadir /qdata/dd --raft --rpc --rpcaddr 0.0.0.0 --rpcapi admin,db,eth,debug,miner,net,shh,txpool,personal,web3,quorum,raft --nodiscover --unlock 0 --password /qdata/passwords.txt --rpcport 0000 --port 0000 --raftport 0000"
+	
+	if [ ! -d /qdata/dd/geth/chaindata ]; then
+	  echo "[*] Mining Genesis block"
+	  /usr/local/bin/geth --datadir /qdata/dd init /qdata/genesis.json
+	fi
+	
+	echo "[*] Starting Constellation node"
+	nohup /usr/local/bin/constellation-node $TMCONF 2>> /qdata/logs/constellation.log &
+	
+	sleep 2
+	
+	echo "[*] Starting node"
+	PRIVATE_CONFIG=$TMCONF nohup /usr/local/bin/geth $GETH_ARGS 2>&1 >>/qdata/logs/geth.log | tee --append /qdata/logs/geth.log`
+
+	dir, _ := os.Getwd()
+
+	for i := 1; i <= s.nodes; i++ {
+		fmt.Println(" - Generating startup-node.sh file for node " + strconv.Itoa(i))
+		tempScr := script
+		tempScr = strings.Replace(tempScr, "--rpcaddr 0.0.0.0", "--rpcaddr "+s.publicIP, 1)
+		tempScr = strings.Replace(tempScr, "--rpcport 0000", "--rpcport "+strconv.Itoa(PortSel.rpc[i-1]), 1)
+		tempScr = strings.Replace(tempScr, "--port 0000", "--port "+strconv.Itoa(PortSel.geth[i-1]), 1)
+		tempScr = strings.Replace(tempScr, "--raftport 0000", "--raftport "+strconv.Itoa(PortSel.raft[i-1]), 1)
+
+		snfilepath := filepath.Join(dir, "/qdata_"+strconv.Itoa(i)+"/start-node.sh")
+		snfile, _ := os.Create(snfilepath)
+		defer snfile.Close()
+		fmt.Fprint(snfile, tempScr)
 	}
 }
 
