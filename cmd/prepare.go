@@ -30,14 +30,11 @@ var prepareCmd = &cobra.Command{
 	Long: `
 Installs the dependencies for network setup`,
 	Run: func(cmd *cobra.Command, args []string) {
-		//get os info
-		fmt.Println(fetchOsInfo())
-		//check network connection
-		checkNetworkConn()
-		//install docker cc
-		installDocker()
-		//install docker cc
-		installDockerCompose()
+		fmt.Println(fetchOsInfo()) //get os info
+		checkNetworkConn()         //check network connection
+		installDocker()            //install docker cc
+		installDockerCompose()     //install docker cc
+		downloadDockerImage()      //docker pull quorum image
 	},
 }
 
@@ -128,9 +125,9 @@ func downloadDockerComposeScr() {
 	cmdCHMOD := exec.Command("sudo", "chmod", "+x", "/usr/local/bin/docker-compose")
 	err := cmdDCS.Run()
 	if err != nil {
-		cmdCHMOD.Run()
+		//cmdCHMOD.Run()
 		fmt.Println()
-		cof.Print(" Docker CE failed to install (Reason - Failed to download Docker Composer) ")
+		cof.Print(" Docker CE failed to install (Reason - Failed to download file) ")
 		fmt.Println()
 	} else {
 		cmdCHMOD.Run()
@@ -146,5 +143,23 @@ func downloadDockerComposeScr() {
 			cof.Print(" Docker Composer failed to install ")
 			fmt.Println()
 		}
+	}
+}
+
+func downloadDockerImage() {
+	codis := color.New(color.FgWhite, color.BgGreen)
+	codfi := color.New(color.FgWhite, color.BgRed)
+	fmt.Println("\nDownloading docker image [xinfinorg/quorum:v2.0.0]...")
+	fmt.Println(" - Executing docker pull command")
+	cmdDID := exec.Command("docker", "pull", "xinfinorg/quorum:v2.0.0")
+	err := cmdDID.Run()
+	if err == nil {
+		fmt.Println()
+		codis.Print(" Docker image downloaded [xinfinorg/quorum:v2.0.0] ")
+		fmt.Print("\n\n")
+	} else {
+		fmt.Println()
+		codfi.Print(" Docker image download failed [xinfinorg/quorum:v2.0.0] ")
+		fmt.Print("\n\n")
 	}
 }

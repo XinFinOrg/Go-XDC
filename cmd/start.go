@@ -27,7 +27,8 @@ var startCmd = &cobra.Command{
 	Long: `
 Start the XDC network`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("start called")
+		fmt.Print("")
+
 	},
 }
 
