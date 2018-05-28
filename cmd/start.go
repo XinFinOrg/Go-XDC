@@ -16,7 +16,9 @@ package cmd
 
 import (
 	"fmt"
+	"os/exec"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -27,8 +29,17 @@ var startCmd = &cobra.Command{
 	Long: `
 Start the XDC network`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Print("")
-
+		cf := color.New(color.FgHiRed)
+		cs := color.New(color.FgHiGreen)
+		fmt.Println("Starting XDC network...")
+		fmt.Println(" - Running docker-compose up")
+		cmdDCR := exec.Command("sudo", "docker-compose", "up", "-d") // define command to execute
+		err := cmdDCR.Run()
+		if err == nil {
+			cs.Println(" - Network startup complete")
+		} else {
+			cf.Println(" - Network startup failed")
+		}
 	},
 }
 

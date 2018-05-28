@@ -16,7 +16,9 @@ package cmd
 
 import (
 	"fmt"
+	"os/exec"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -27,7 +29,17 @@ var stopCmd = &cobra.Command{
 	Long: `
 Stop the XDC network`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("stop called")
+		cf := color.New(color.FgHiRed)
+		cs := color.New(color.FgHiGreen)
+		fmt.Println("Stopping XDC network...")
+		fmt.Println(" - Running docker-compose down")
+		cmdDCR := exec.Command("sudo", "docker-compose", "down") // define command to execute
+		err := cmdDCR.Run()
+		if err == nil {
+			cs.Println(" - Network stop complete")
+		} else {
+			cf.Println(" - Network stop failed")
+		}
 	},
 }
 

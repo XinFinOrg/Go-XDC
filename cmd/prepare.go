@@ -84,8 +84,8 @@ func installDocker() {
 }
 
 func downloadDockerSetupScr() {
-	cos := color.New(color.FgWhite, color.BgGreen)
-	cof := color.New(color.FgWhite, color.BgRed)
+	cos := color.New(color.FgWhite, color.BgHiGreen)
+	cof := color.New(color.FgWhite, color.BgHiRed)
 	fmt.Println(" - Downloading docker setup script from get-docker.com")
 	cmdDSS := exec.Command("wget", "--tries=3", "get-docker.com", "-O", "docker-setup.sh")
 	err := cmdDSS.Run()
@@ -117,8 +117,8 @@ func installDockerCompose() {
 }
 
 func downloadDockerComposeScr() {
-	cos := color.New(color.FgWhite, color.BgGreen)
-	cof := color.New(color.FgWhite, color.BgRed)
+	cos := color.New(color.FgWhite, color.BgHiGreen)
+	cof := color.New(color.FgWhite, color.BgHiRed)
 	fmt.Println(" - Downloading Docker Compose")
 	cmdDCS := exec.Command("/bin/sh", "-c", "wget --read-timeout=30 https://github.com/docker/compose/releases/download/1.21.1/docker-compose-$(uname -s)-$(uname -m) -O /usr/local/bin/docker-compose")
 	//cmdDCS:= exec.Command("ls")
@@ -147,8 +147,8 @@ func downloadDockerComposeScr() {
 }
 
 func downloadDockerImage() {
-	codis := color.New(color.FgWhite, color.BgGreen)
-	codfi := color.New(color.FgWhite, color.BgRed)
+	codis := color.New(color.FgWhite, color.BgHiGreen)
+	codfi := color.New(color.FgWhite, color.BgHiRed)
 	fmt.Println("\nDownloading docker image [xinfinorg/quorum:v2.0.0]...")
 	fmt.Println(" - Executing docker pull command")
 	cmdDID := exec.Command("docker", "pull", "xinfinorg/quorum:v2.0.0")

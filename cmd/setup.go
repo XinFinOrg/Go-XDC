@@ -100,7 +100,7 @@ func init() {
 }
 
 func getUserInput(s *Inputs) {
-	c := color.New(color.FgWhite, color.BgBlue) // create a new color object
+	c := color.New(color.FgWhite, color.BgHiBlue) // create a new color object
 
 	fmt.Println()
 	c.Println(" Define General Parameters ")
@@ -194,7 +194,7 @@ func setupNetwork(s *Inputs) {
 }
 
 func setupComplete() {
-	c := color.New(color.FgWhite, color.BgGreen) // create a new color object
+	c := color.New(color.FgWhite, color.BgHiGreen) // create a new color object
 
 	fmt.Println()
 	c.Println(" Setup complete ")
