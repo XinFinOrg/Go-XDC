@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 
 	"github.com/fatih/color"
@@ -38,6 +39,11 @@ Start the XDC network`,
 		if err == nil {
 			cs.Println(" - Network startup complete")
 		} else {
+			dir, _ := os.Getwd()
+			_, err := os.Stat(dir + "/docker-compose.yml")
+			if err != nil {
+				cf.Println(" - docker-compose.yml file not found")
+			}
 			cf.Println(" - Network startup failed")
 		}
 	},
