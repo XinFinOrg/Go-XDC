@@ -370,7 +370,7 @@ func createTmFiles(s *Inputs) {
 		tmfilepath := filepath.Join(dir, "/"+qd+"/tm.conf")
 		tmfile, _ := os.Create(tmfilepath)
 		defer tmfile.Close()
-		fmt.Fprintln(tmfile, `url = "`+s.publicIP+`"`)
+		fmt.Fprintln(tmfile, `url ="http://`+s.publicIP+":"+strconv.Itoa(PortSel.constellation[i-1])+`"`)
 		fmt.Fprintln(tmfile, `port =`+strconv.Itoa(PortSel.constellation[i-1]))
 		fmt.Fprintln(tmfile, `socket = "/qdata/tm.ipc"`)
 		fmt.Fprintln(tmfile, `othernodes = `+makeOtherNodesString(s.publicIP))
@@ -385,7 +385,7 @@ func makeOtherNodesString(publicIP string) string {
 	var str string
 
 	for _, elem := range PortSel.constellation {
-		str = str + `"` + publicIP + `:` + strconv.Itoa(elem) + `",`
+		str = str + `"http://` + publicIP + `:` + strconv.Itoa(elem) + `",`
 	}
 
 	lastChar := str[len(str)-1:]
@@ -539,7 +539,6 @@ func createStartNodeScript(s *Inputs) {
 	for i := 1; i <= s.nodes; i++ {
 		fmt.Println(" - Generating startup-node.sh file for node " + strconv.Itoa(i))
 		tempScr := script
-		tempScr = strings.Replace(tempScr, "--rpcaddr 0.0.0.0", "--rpcaddr "+s.publicIP, 1)
 		tempScr = strings.Replace(tempScr, "--rpcport 0000", "--rpcport "+strconv.Itoa(PortSel.rpc[i-1]), 1)
 		tempScr = strings.Replace(tempScr, "--port 0000", "--port "+strconv.Itoa(PortSel.geth[i-1]), 1)
 		tempScr = strings.Replace(tempScr, "--raftport 0000", "--raftport "+strconv.Itoa(PortSel.raft[i-1]), 1)
