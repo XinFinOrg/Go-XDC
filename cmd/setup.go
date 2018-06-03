@@ -25,7 +25,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"gopkg.in/AlecAivazis/survey.v1"
-	yaml "gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v2"
 
 	"bytes"
 	"strings"
@@ -35,15 +35,16 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"golang.org/x/net/context"
+	"github.com/spf13/viper"
 )
 
 // struct holds user provided input data
 type Inputs struct {
-	networkName    string
-	publicIP       string
-	dockerSubnetIP string
-	portRange      int
-	nodes          int
+	NetworkName    string `mapstructure:"network_name"`
+	PublicIP       string `mapstructure:"public_ip"`
+	DockerSubnetIP string `mapstructure:"docker_ip"`
+	PortRange      int    `mapstructure:"port_range"`
+	Nodes          int
 }
 
 // port selection struct
@@ -83,7 +84,15 @@ var setupCmd = &cobra.Command{
 Setup the XDC network`,
 	Run: func(cmd *cobra.Command, args []string) {
 		userInput := Inputs{}
-		getUserInput(&userInput)
+
+		filename := "config.yml"
+
+		if _, err := os.Stat(filename); os.IsNotExist(err) {
+			getUserInput(&userInput)
+		} else {
+			readConfigFile(&userInput)
+		}
+
 		setupNetwork(&userInput)
 	},
 }
@@ -92,11 +101,30 @@ func init() {
 	rootCmd.AddCommand(setupCmd)
 	/*setupCmd.Flags().StringVarP(&projectName,"projectname", "p", "XDC-NW", "Project name for your network")
 	setupCmd.Flags().IntVarP(&nodes,"nodes",  "n", 2,"Enter number of inital static nodes")
-	setupCmd.Flags().StringVarP(&publicIP,"ipaddress",  "i", "","Enter Public IP of this machine")
+	setupCmd.Flags().StringVarP(&PublicIP,"ipaddress",  "i", "","Enter Public IP of this machine")
 
 	setupCmd.MarkFlagRequired("projectname")
 	setupCmd.MarkFlagRequired("nodes")
 	setupCmd.MarkFlagRequired("ipaddress")*/
+}
+
+func readConfigFile(s *Inputs) {
+
+	viper.SetConfigName("config")
+	viper.AddConfigPath(".")
+
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf("Error reading config file, %s", err)
+	}
+	err := viper.Unmarshal(&s)
+	if err != nil {
+		log.Fatalf("unable to decode into struct, %v", err)
+	}
+	fmt.Println("Network Name: ", s.NetworkName)
+	fmt.Println("Public IP: ", s.PublicIP)
+	fmt.Println("Docker Subnet: ", s.DockerSubnetIP)
+	fmt.Println("Starting Port Range:", s.PortRange)
+	fmt.Println("Number of Nodes: ", s.Nodes)
 }
 
 func getUserInput(s *Inputs) {
@@ -107,26 +135,26 @@ func getUserInput(s *Inputs) {
 	fmt.Println()
 
 	//define nodeCount prompt
-	nodeCountPrompt := &survey.Input{Message: "Number Of Nodes To Create", Default: "4", Help: "No of nodes to create"}
+	nodeCountPrompt := &survey.Input{Message: "Number Of Nodes To Create", Default: "4", Help: "No of Nodes to create"}
 
 	//define network name prompt
 	networkNamePrompt := &survey.Input{Message: "Network Name", Default: "XDC-Network"}
 
-	survey.AskOne(nodeCountPrompt, &s.nodes, nil)
-	survey.AskOne(networkNamePrompt, &s.networkName, nil)
+	survey.AskOne(nodeCountPrompt, &s.Nodes, nil)
+	survey.AskOne(networkNamePrompt, &s.NetworkName, nil)
 
 	fmt.Println()
 	c.Println(" Define IP Address ")
 	fmt.Println()
 
-	//define publicIP prompt
+	//define PublicIP prompt
 	publicIPPrompt := &survey.Input{Message: "Public IP Address", Default: "0.0.0.0"}
 
 	//define docker subnet prompt
 	dockerSubnetIPPrompt := &survey.Input{Message: "Docker Subnet IP", Default: "172.13.0.0/16"}
 
-	survey.AskOne(publicIPPrompt, &s.publicIP, nil)
-	survey.AskOne(dockerSubnetIPPrompt, &s.dockerSubnetIP, nil)
+	survey.AskOne(publicIPPrompt, &s.PublicIP, nil)
+	survey.AskOne(dockerSubnetIPPrompt, &s.DockerSubnetIP, nil)
 
 	fmt.Println()
 	c.Println(" Define Ports ")
@@ -135,15 +163,15 @@ func getUserInput(s *Inputs) {
 	//define port range prompt
 	portPrompt := &survey.Input{Message: "Assign Ports from", Default: "20000"}
 
-	survey.AskOne(portPrompt, &s.portRange, nil)
+	survey.AskOne(portPrompt, &s.PortRange, nil)
 
 	//fmt.Printf("%+v", s)
 }
 
-/* Get unused port when portRange and portType is defined
+/* Get unused port when PortRange and portType is defined
 host - host name (localhost)
 portType - [GETH,RAFT,CONSTELLATION,RPC]
-portRange - scan free ports after this port
+PortRange - scan free ports after this port
 */
 func getUnusedPort(host string, portType int, portRange int) int {
 	portt := 0
@@ -222,7 +250,7 @@ func scaffoldNodeDir(s *Inputs) {
 	fmt.Fprintf(staticnodesfile, "[\n")
 
 	//Create dir structure/files & add enode urls to static-nodes.json [for each node]
-	for i := 1; i <= s.nodes; i++ {
+	for i := 1; i <= s.Nodes; i++ {
 		qd = "qdata_" + strconv.Itoa(i)
 
 		fmt.Println(" - Creating dir structure for node " + strconv.Itoa(i) + " - " + qd)
@@ -257,7 +285,7 @@ func scaffoldNodeDir(s *Inputs) {
 		}
 
 		//Separator for static-nodes.json urls - no comma after last node address
-		if i < s.nodes {
+		if i < s.Nodes {
 			separator = ","
 		} else {
 			separator = ""
@@ -297,11 +325,11 @@ func scaffoldNodeDir(s *Inputs) {
 		enode_id = strings.TrimRight(enode_id, "\r\n")
 		fmt.Println(" - Generating nodeKey for node " + strconv.Itoa(i))
 		//Construct enode url
-		enode_url = "enode://" + enode_id + "@" + s.publicIP + ":" + strconv.Itoa(getUnusedPort("localhost", 0, s.portRange)) + "?discport=0&raftport=" + strconv.Itoa(getUnusedPort("localhost", 1, s.portRange))
+		enode_url = "enode://" + enode_id + "@" + s.PublicIP + ":" + strconv.Itoa(getUnusedPort("localhost", 0, s.PortRange)) + "?discport=0&raftport=" + strconv.Itoa(getUnusedPort("localhost", 1, s.PortRange))
 		fmt.Fprintf(staticnodesfile, strconv.Quote(enode_url)+separator+"\n")
 
 		//assign/reserve rpc port
-		getUnusedPort("localhost", 3, s.portRange)
+		getUnusedPort("localhost", 3, s.PortRange)
 
 		// Generate Quorum-related keys (used by Constellation)
 		// NOTE: using sh here as this command asks user input for the password
@@ -343,7 +371,7 @@ func createDockerComposeFile(s *Inputs) {
 
 //copy static-nodes.json to each qdata folder
 func copyStaticNode(s *Inputs) {
-	for i := 1; i <= s.nodes; i++ {
+	for i := 1; i <= s.Nodes; i++ {
 		_, err := exec.Command("cp", "static-nodes.json", "qdata_"+strconv.Itoa(i)+"/dd").Output()
 		if err != nil {
 			panic(err)
@@ -355,25 +383,25 @@ func copyStaticNode(s *Inputs) {
 //create tm conf files [ TO-DO ]
 func createTmFiles(s *Inputs) {
 
-	// allocate constellation ports for all the nodes
-	for i := 1; i <= s.nodes; i++ {
-		getUnusedPort("localhost", 2, s.portRange)
+	// allocate constellation ports for all the Nodes
+	for i := 1; i <= s.Nodes; i++ {
+		getUnusedPort("localhost", 2, s.PortRange)
 	}
 
 	//Get Working Directory
 	dir, _ := os.Getwd()
 
-	for i := 1; i <= s.nodes; i++ {
+	for i := 1; i <= s.Nodes; i++ {
 		fmt.Println(" - Generating tm.conf files for node " + strconv.Itoa(i))
 		qd = "qdata_" + strconv.Itoa(i)
 		//create tmconf
 		tmfilepath := filepath.Join(dir, "/"+qd+"/tm.conf")
 		tmfile, _ := os.Create(tmfilepath)
 		defer tmfile.Close()
-		fmt.Fprintln(tmfile, `url ="http://`+s.publicIP+":"+strconv.Itoa(PortSel.constellation[i-1])+`"`)
+		fmt.Fprintln(tmfile, `url ="http://`+s.PublicIP+":"+strconv.Itoa(PortSel.constellation[i-1])+`"`)
 		fmt.Fprintln(tmfile, `port =`+strconv.Itoa(PortSel.constellation[i-1]))
 		fmt.Fprintln(tmfile, `socket = "/qdata/tm.ipc"`)
-		fmt.Fprintln(tmfile, `othernodes = `+makeOtherNodesString(s.publicIP))
+		fmt.Fprintln(tmfile, `othernodes = `+makeOtherNodesString(s.PublicIP))
 		fmt.Fprintln(tmfile, `publickeys = ["/qdata/keys/tm.pub"]`)
 		fmt.Fprintln(tmfile, `privatekeys = ["/qdata/keys/tm.key"]`)
 		fmt.Fprintln(tmfile, `storage = "/qdata/constellation"`)
@@ -477,7 +505,7 @@ type Configuration struct {
 
 func createMockConfig(s *Inputs) Configuration {
 	servtest1 := map[string]Node{}
-	for i := 0; i < s.nodes; i++ {
+	for i := 0; i < s.Nodes; i++ {
 		rpcPortStr := strconv.Itoa(PortSel.rpc[i])
 		gethPortStr := strconv.Itoa(PortSel.geth[i])
 		constellationPortStr := strconv.Itoa(PortSel.constellation[i])
@@ -499,7 +527,7 @@ func createMockConfig(s *Inputs) Configuration {
 				Driver: "bridge",
 				IPAM: IPAM{
 					Driver: "default",
-					Config: []Subnet{Subnet{Subnet: s.dockerSubnetIP}},
+					Config: []Subnet{Subnet{Subnet: s.DockerSubnetIP}},
 				},
 			},
 		},
@@ -510,7 +538,7 @@ func createStartNodeScript(s *Inputs) {
 	var script = `#!/bin/bash
 
 	#
-	# This is used at Container start up to run the constellation and geth nodes
+	# This is used at Container start up to run the constellation and geth Nodes
 	#
 	
 	set -u
@@ -536,7 +564,7 @@ func createStartNodeScript(s *Inputs) {
 
 	dir, _ := os.Getwd()
 
-	for i := 1; i <= s.nodes; i++ {
+	for i := 1; i <= s.Nodes; i++ {
 		fmt.Println(" - Generating startup-node.sh file for node " + strconv.Itoa(i))
 		tempScr := script
 		tempScr = strings.Replace(tempScr, "--rpcport 0000", "--rpcport "+strconv.Itoa(PortSel.rpc[i-1]), 1)

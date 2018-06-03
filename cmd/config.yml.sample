@@ -1,0 +1,14 @@
+# Unique Network Name
+network_name: XDC-NW1
+
+# Public IP of this host
+public_ip: 192.168.1.38
+
+# Unique Private Docker Subnet
+docker_ip: 172.15.0.0/16
+
+# Starting port to use for this network
+port_range: 30000
+
+# Number of inital static nodes
+nodes: 3
