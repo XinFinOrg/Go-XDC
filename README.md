@@ -1,5 +1,7 @@
 # go-xdc
-A wrapper CLI for setting up the xdc blockchain network
+A wrapper CLI for setting up the xdc blockchain network which uses the XDC docker setup.
+
+https://github.com/XinFinorg/XDC01-docker-Nnodes
 
 ```
 Usage:
