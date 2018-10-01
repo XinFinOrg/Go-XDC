@@ -149,17 +149,17 @@ func downloadDockerComposeScr() {
 func downloadDockerImage() {
 	codis := color.New(color.FgWhite, color.BgHiGreen)
 	codfi := color.New(color.FgWhite, color.BgHiRed)
-	fmt.Println("\nDownloading docker image [xinfinorg/quorum:v2.0.2]...")
+	fmt.Println("\nDownloading docker image [xinfinorg/quorum:v2.1.0]...")
 	fmt.Println(" - Executing docker pull command")
-	cmdDID := exec.Command("docker", "pull", "xinfinorg/quorum:v2.0.2")
+	cmdDID := exec.Command("docker", "pull", "xinfinorg/quorum:v2.1.0")
 	err := cmdDID.Run()
 	if err == nil {
 		fmt.Println()
-		codis.Print(" Docker image downloaded [xinfinorg/quorum:v2.0.2] ")
+		codis.Print(" Docker image downloaded [xinfinorg/quorum:v2.1.0] ")
 		fmt.Print("\n\n")
 	} else {
 		fmt.Println()
-		codfi.Print(" Docker image download failed [xinfinorg/quorum:v2.0.2] ")
+		codfi.Print(" Docker image download failed [xinfinorg/quorum:v2.1.0] ")
 		fmt.Print("\n\n")
 	}
 }
