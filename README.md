@@ -3,6 +3,8 @@ A wrapper CLI for setting up the xdc blockchain network which uses the XDC docke
 
 https://github.com/XinFinorg/XDC01-docker-Nnodes
 
+Current Version :- Quorum v2.1.0
+
 ```
 Usage:
   xdc [command]
@@ -21,6 +23,6 @@ Flags:
 
 Use "xdc [command] --help" for more information about a command.
 
-Complete documentation available at https://xinfin.io/
+Complete documentation available at https://www.xinfin.org/
 
 ```
