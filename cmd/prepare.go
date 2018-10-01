@@ -68,7 +68,7 @@ func fetchOsInfo() string {
 func checkNetworkConn() {
 	c := color.New(color.FgWhite, color.BgBlue) // create a new color object
 	fmt.Println("Checking network connection...\n")
-	cmdCN := exec.Command("ping", "-c", "3", "8.8.8.8")
+	cmdCN := exec.Command("ping", "-c", "3", "4.2.2.1")
 	c.Print(" Network Status ")
 	err := cmdCN.Run()
 	if err == nil {
@@ -149,17 +149,17 @@ func downloadDockerComposeScr() {
 func downloadDockerImage() {
 	codis := color.New(color.FgWhite, color.BgHiGreen)
 	codfi := color.New(color.FgWhite, color.BgHiRed)
-	fmt.Println("\nDownloading docker image [xinfinorg/quorum:v2.0.0]...")
+	fmt.Println("\nDownloading docker image [xinfinorg/quorum:v2.0.1]...")
 	fmt.Println(" - Executing docker pull command")
-	cmdDID := exec.Command("docker", "pull", "xinfinorg/quorum:v2.0.0")
+	cmdDID := exec.Command("docker", "pull", "xinfinorg/quorum:v2.0.1")
 	err := cmdDID.Run()
 	if err == nil {
 		fmt.Println()
-		codis.Print(" Docker image downloaded [xinfinorg/quorum:v2.0.0] ")
+		codis.Print(" Docker image downloaded [xinfinorg/quorum:v2.0.1] ")
 		fmt.Print("\n\n")
 	} else {
 		fmt.Println()
-		codfi.Print(" Docker image download failed [xinfinorg/quorum:v2.0.0] ")
+		codfi.Print(" Docker image download failed [xinfinorg/quorum:v2.0.1] ")
 		fmt.Print("\n\n")
 	}
 }

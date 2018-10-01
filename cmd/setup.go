@@ -60,7 +60,7 @@ var RAFT_PORT_OFFSET = 100
 var CONSTELLATION_PORT_OFFSET = 200
 var RPC_PORT_OFFSET = 300
 
-var image = "xinfinorg/quorum:v2.0.0"
+var image = "xinfinorg/quorum:v2.0.1"
 
 var qd string
 var separator string
@@ -511,7 +511,7 @@ func createMockConfig(s *Inputs) Configuration {
 		constellationPortStr := strconv.Itoa(PortSel.constellation[i])
 		raftPortStr := strconv.Itoa(PortSel.raft[i])
 		servtest1["node_"+strconv.Itoa(i+1)] = Node{
-			Image:    "xinfinorg/quorum:v2.0.0",
+			Image:    "xinfinorg/quorum:v2.0.1",
 			Restart:  "always",
 			Volumes:  []string{"./qdata_" + strconv.Itoa(i+1) + ":/qdata"},
 			Networks: []string{"xdc_network"},
