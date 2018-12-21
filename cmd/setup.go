@@ -428,7 +428,7 @@ func makeOtherNodesString(publicIP string) string {
 func runDockerContainer(hostPath string, containerPath string, cmdString []string) string {
 
 	ctx := context.Background()
-	cli, err := client.NewEnvClient()
+	cli, err := client.NewClientWithOpts(client.WithVersion("1.39"))
 	if err != nil {
 		panic(err)
 	}
