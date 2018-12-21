@@ -6,7 +6,7 @@ Current Version :- Quorum v2.1.0
 ## Prerequisite
 **Operating System**: Ubuntu 16.04 64-bit or higher
 
-**Tools**: Go v1.10 or higher with approriate PATH variables set
+**Tools**: Go v1.10 or higher with approriate PATH variables set, Docker & Docker Compose
  
 ## Clone repository in your $GOPATH
 
