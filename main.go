@@ -14,7 +14,7 @@
 
 package main
 
-import "go-xdc/cmd"
+import "github.com/XinFinOrg/go-xdc/cmd"
 
 func main() {
 	cmd.Execute()
